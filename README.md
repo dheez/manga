@@ -1,4 +1,4 @@
-##manga
+## manga
 This script scrapes the website mangakatana.com.\
 
 dependencies: curl wget dmenu sxiv \
