@@ -1,7 +1,10 @@
 #!/bin/bash
+#simple but effective script to scrape mangakatana.
+#dependencies: curl dmenu wget sxiv (and the basic commands you probably already have like grep etc.)
+#you need to create a directory called "mangachapters" in your ~/.cache directory
 
-menucmd="dmenu -l 15"
-searchlink="https://mangakatana.com/?search="
+menucmd="dmenu -l 15" #add your fonts and stuff if you need
+searchlink="https://mangakatana.com/?search=" #website to scrape
 while true; do
 
 	query=$(echo | $menucmd -p "Search:")
@@ -9,8 +12,9 @@ while true; do
 
 	query=$(tr ' ' '+' <<< $query)
 	site=$(curl -sL -w %{url_effective} $searchlink$query)
-	redir=$(echo $site | grep -Eo 'https://mangakatana.com/[a-zA-Z0-9."/?+=-]*' | tail -n1 )
+	redir=$(echo $site | grep -Eo 'https://mangakatana.com/[a-zA-Z0-9."/?+=-]*' | tail -n1 ) 
 
+	#this is where we scrape the link to the manga we searched for
 	if [ -n "$(grep search <<< $redir)" ]; then
 		mangas=$( echo $site | grep -Eo "https://mangakatana.com/manga/[a-zA-Z0-9./?+=-]*\">[a-zA-Z.0-9 /?:!',-]*</a>" | grep -Ev "/c[0-9.]*\"|/fc\"" | uniq )
 		mangakeys=$(grep -Eo ">[a-zA-Z.0-9 /?:!',-]*<" <<< "$mangas" | sed 's,<,,g;s,>,,g'| tr '[:upper:]' '[:lower:]')
@@ -23,6 +27,7 @@ while true; do
 		mangalink=$redir
 	fi
 
+	# this is where we scrape the links to the manga chapters and scrape the pictures
 	while true; do
 		chapters=$(echo $site | grep -Eo "${mangalink}/c[0-9.\"]*>[a-zA-Z0-9. :?\!()',-]*</a>" | tac)
 		chapterkeys=$(grep -Eo ">[a-zA-Z0-9 .?:/()',-]*<" <<< "$chapters" | sed 's,<,,g;s,>,,g' | tr '[:upper:]' '[:lower:]')
@@ -36,16 +41,16 @@ while true; do
 		picturelinks=$(echo $chaptersite |  grep -Eo "(http|https)://i3.mangakatana.com/token/[a-zA-Z0-9./?=_%:-]*(jpeg|jpg|png)" | uniq)
 		a="a"
 		for i in $picturelinks; do
-			wget -O $HOME/.cache/mangachapters/"$a" $i &> /dev/null &
-			echo fetching page $(( $(wc -m <<< "$a") - 1))
-			a="a${a}" 
+			wget -O $HOME/.cache/mangachapters/"$a" $i &> /dev/null & # rename the file to a string of a's to 
+			echo fetching page $(( $(wc -m <<< "$a") - 1))  	  # retain the order, because sxiv opens
+			a="a${a}" 						  # files in alphabetical order
 		done
 
-		for job in $(jobs -p); do
-			wait $job && echo done
+		for job in $(jobs -p); do 	#wait for the wget instances to finish,
+			wait $job && echo done  #since we started them all at the same time
 		done
 
-		sxiv $HOME/.cache/mangachapters 
-		rm $HOME/.cache/mangachapters/* && echo cleaned up || echo error removing files
+		sxiv $HOME/.cache/mangachapters #open scraped pictures
+		rm $HOME/.cache/mangachapters/* && echo cleaned up || echo error removing files #remove pictures
 	done
 done
